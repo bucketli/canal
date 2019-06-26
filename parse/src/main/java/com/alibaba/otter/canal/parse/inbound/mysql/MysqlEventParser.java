@@ -186,10 +186,12 @@ public class MysqlEventParser extends AbstractMysqlEventParser implements CanalE
         // 开始mysql心跳sql
         if (detectingEnable && StringUtils.isNotBlank(detectingSQL)) {
             return new MysqlDetectingTimeTask((MysqlConnection) connection.fork());
-        } else {
+        } else if (detectingSelfAlive) {
             return super.buildHeartBeatTimeTask(connection);
+        } else {
+            logger.warn("heart beat time task not start , just for debug.");
+            return null;
         }
-
     }
 
     protected void stopHeartBeat() {

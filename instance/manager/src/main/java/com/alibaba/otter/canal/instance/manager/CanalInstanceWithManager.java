@@ -301,6 +301,7 @@ public class CanalInstanceWithManager extends AbstractCanalInstance {
             mysqlEventParser.setReceiveBufferSize(parameters.getReceiveBufferSize());
             // 心跳检查参数
             mysqlEventParser.setDetectingEnable(parameters.getDetectingEnable());
+            mysqlEventParser.setDetectingSelfAlive(parameters.getDetectingSelfAlive());
             mysqlEventParser.setDetectingSQL(parameters.getDetectingSQL());
             mysqlEventParser.setDetectingIntervalInSeconds(parameters.getDetectingIntervalInSeconds());
             // 数据库信息参数
@@ -379,6 +380,7 @@ public class CanalInstanceWithManager extends AbstractCanalInstance {
             localBinlogEventParser.setDirectory(parameters.getLocalBinlogDirectory());
             localBinlogEventParser.setProfilingEnabled(false);
             localBinlogEventParser.setDetectingEnable(parameters.getDetectingEnable());
+            localBinlogEventParser.setDetectingSelfAlive(parameters.getDetectingSelfAlive());
             localBinlogEventParser.setDetectingIntervalInSeconds(parameters.getDetectingIntervalInSeconds());
             localBinlogEventParser.setFilterTableError(parameters.getFilterTableError());
             localBinlogEventParser.setParallel(parameters.getParallel());

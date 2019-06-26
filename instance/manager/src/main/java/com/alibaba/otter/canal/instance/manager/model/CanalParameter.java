@@ -75,6 +75,7 @@ public class CanalParameter implements Serializable {
 
     // 心跳检查信息
     private Boolean                  detectingEnable                    = true;                      // 是否开启心跳语句
+    private Boolean                  detectingSelfAlive                 = true;                      // 当 detectingEnable = false 的时候，是否生成 dummy event 以便让下游知晓 server 还活着
     private Boolean                  heartbeatHaEnable                  = false;                     // 是否开启基于心跳检查的ha功能
     private String                   detectingSQL;                                                   // 心跳sql
     private Integer                  detectingIntervalInSeconds         = 3;                         // 检测频率
@@ -573,6 +574,14 @@ public class CanalParameter implements Serializable {
 
     public Boolean getDetectingEnable() {
         return detectingEnable;
+    }
+
+    public Boolean getDetectingSelfAlive() {
+        return detectingSelfAlive;
+    }
+
+    public void setDetectingSelfAlive(Boolean detectingSelfAlive) {
+        this.detectingSelfAlive = detectingSelfAlive;
     }
 
     public void setDetectingEnable(Boolean detectingEnable) {
