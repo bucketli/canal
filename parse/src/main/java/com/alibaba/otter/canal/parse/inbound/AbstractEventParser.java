@@ -40,7 +40,7 @@ import com.alibaba.otter.canal.sink.exception.CanalSinkException;
 
 /**
  * 抽象的EventParser, 最大化共用mysql/oracle版本的实现
- * 
+ *
  * @author jianghang 2013-1-20 下午08:10:25
  * @version 1.0.0
  */
@@ -86,6 +86,7 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
     protected AtomicBoolean                          needTransactionPosition    = new AtomicBoolean(false);
     protected long                                   lastEntryTime              = 0L;
     protected volatile boolean                       detectingEnable            = true;                                    // 是否开启心跳检查
+    protected volatile boolean                       detectingSelfAlive         = true;                                    // 当 detectingEnable = false 的时候，是否生成 dummy event 以便让下游知晓 server 还活着
     protected Integer                                detectingIntervalInSeconds = 3;                                       // 检测频率
     protected volatile Timer                         timer;
     protected TimerTask                              heartBeatTimerTask;
@@ -486,8 +487,10 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
         if (heartBeatTimerTask == null) {// fixed issue #56，避免重复创建heartbeat线程
             heartBeatTimerTask = buildHeartBeatTimeTask(connection);
             Integer interval = detectingIntervalInSeconds;
-            timer.schedule(heartBeatTimerTask, interval * 1000L, interval * 1000L);
-            logger.info("start heart beat.... ");
+            if (heartBeatTimerTask != null) {
+                timer.schedule(heartBeatTimerTask, interval * 1000L, interval * 1000L);
+                logger.info("start heart beat.... ");
+            }
         }
     }
 
@@ -595,6 +598,10 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
 
     public void setDetectingEnable(boolean detectingEnable) {
         this.detectingEnable = detectingEnable;
+    }
+
+    public void setDetectingSelfAlive(boolean detectingSelfAlive) {
+        this.detectingSelfAlive = detectingSelfAlive;
     }
 
     public void setDetectingIntervalInSeconds(Integer detectingIntervalInSeconds) {

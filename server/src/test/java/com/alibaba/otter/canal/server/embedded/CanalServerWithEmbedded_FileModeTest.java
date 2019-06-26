@@ -45,6 +45,7 @@ public class CanalServerWithEmbedded_FileModeTest extends BaseCanalServerWithEmb
         parameter.setSendBufferSize(8 * 1024);
 
         parameter.setDetectingEnable(false);
+        parameter.setDetectingSelfAlive(true);
         parameter.setDetectingIntervalInSeconds(10);
         parameter.setDetectingRetryTimes(3);
         parameter.setDetectingSQL(DETECTING_SQL);
