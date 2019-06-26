@@ -95,8 +95,8 @@
         <!--maven properties-->
         <downloadSources>true</downloadSources>
         <!-- compiler settings properties -->
-        <java_source_version>1.8</java_source_version>
-        <java_target_version>1.8</java_target_version>
+        <java_source_version>12</java_source_version>
+        <java_target_version>12</java_target_version>
         <file_encoding>UTF-8</file_encoding>
         <spring_version>3.2.18.RELEASE</spring_version>
         <rocketmq_version>4.5.1</rocketmq_version>
@@ -414,6 +414,13 @@
                         </execution>
                     </executions>
                 <configuration>
+                    <!-- workaround for https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+                    <javaApiLinks>
+                        <property>
+                            <name>foo</name>
+                            <value>bar</value>
+                        </property>
+                    </javaApiLinks>
                   <encoding>${file_encoding}</encoding>
                   <charset>${file_encoding}</charset>
                   <additionalparam>-Xdoclint:none</additionalparam>
