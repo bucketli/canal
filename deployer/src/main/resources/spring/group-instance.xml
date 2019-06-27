@@ -66,6 +66,7 @@
 		<property name="slaveId" value="${canal.instance.mysql.slaveId:0}" />
 		<!-- 心跳配置 -->
 		<property name="detectingEnable" value="${canal.instance.detecting.enable:false}" />
+		<property name="detectingSelfAlive" value="${canal.instance.detectingSelfAlive:true}" />
 		<property name="detectingSQL" value="${canal.instance.detecting.sql}" />
 		<property name="detectingIntervalInSeconds" value="${canal.instance.detecting.interval.time:5}" />
 		<property name="haController">
