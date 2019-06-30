@@ -469,28 +469,29 @@ public abstract class AbstractEventParser<EVENT> extends AbstractCanalLifeCycle 
 
     protected void startHeartBeat(ErosaConnection connection) {
         lastEntryTime = 0L; // 初始化
-        if (timer == null) {// lazy初始化一下
-            String name = String.format("destination = %s , address = %s , HeartBeatTimeTask",
-                destination,
-                runningInfo == null ? null : runningInfo.getAddress().toString());
-            synchronized (AbstractEventParser.class) {
-                // synchronized (MysqlEventParser.class) {
-                // why use MysqlEventParser.class, u know, MysqlEventParser is
-                // the child class 4 AbstractEventParser,
-                // do this is ...
-                if (timer == null) {
-                    timer = new Timer(name, true);
-                }
-            }
-        }
-
         if (heartBeatTimerTask == null) {// fixed issue #56，避免重复创建heartbeat线程
             heartBeatTimerTask = buildHeartBeatTimeTask(connection);
-            Integer interval = detectingIntervalInSeconds;
-            if (heartBeatTimerTask != null) {
-                timer.schedule(heartBeatTimerTask, interval * 1000L, interval * 1000L);
-                logger.info("start heart beat.... ");
+        }
+
+        if (heartBeatTimerTask != null) {
+            if (timer == null) {// lazy初始化一下
+                String name = String.format("destination = %s , address = %s , HeartBeatTimeTask",
+                        destination,
+                        runningInfo == null ? null : runningInfo.getAddress().toString());
+                synchronized (AbstractEventParser.class) {
+                    // synchronized (MysqlEventParser.class) {
+                    // why use MysqlEventParser.class, u know, MysqlEventParser is
+                    // the child class 4 AbstractEventParser,
+                    // do this is ...
+                    if (timer == null) {
+                        timer = new Timer(name, true);
+                    }
+                }
             }
+
+            Integer interval = detectingIntervalInSeconds;
+            timer.schedule(heartBeatTimerTask, interval * 1000L, interval * 1000L);
+            logger.info("start heart beat.... ");
         }
     }
 
