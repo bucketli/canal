@@ -1,10 +1,23 @@
 package com.alibaba.otter.canal.migration.extractor;
 
+import java.text.MessageFormat;
+import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
+
 import com.alibaba.otter.canal.common.AbstractCanalLifeCycle;
 import com.alibaba.otter.canal.common.CanalException;
+import com.alibaba.otter.canal.common.utils.NamedThreadFactory;
+import com.alibaba.otter.canal.migration.metadata.ColumnValue;
+import com.alibaba.otter.canal.migration.metadata.MigrationTable;
+import com.alibaba.otter.canal.migration.model.KeyPosition;
 import com.alibaba.otter.canal.migration.model.MigrationRecord;
+import com.alibaba.otter.canal.migration.process.ExtractStatus;
+import com.alibaba.otter.canal.migration.process.ProgressStatus;
+import com.alibaba.otter.canal.migration.process.RunMode;
+import com.google.common.collect.Lists;
+import org.apache.commons.lang.StringUtils;
 
-import java.util.List;
+import javax.sql.DataSource;
 
 /**
  * @author bucketli 2019-06-30 11:01
@@ -12,18 +25,128 @@ import java.util.List;
  */
 public class KeyRecordExtractor extends AbstractCanalLifeCycle implements MigrationRecordExtractor {
 
+    private static final String                  extractSQLFormat    = "select `{0}` from `{1}`.`{2}` where `{3}` > ? order by `{4}` limit ?";
+    private static final String                  minimumKeySQLFormat = "select min(`{0}`) form `{1}`.`{2}`";
+    private String                               minimumKeySQL;
+    private String                               extractSQL;
+    private MigrationTable                       table;
+    private LinkedBlockingQueue<MigrationRecord> queue;
+    private int                                  crawSize;
+    private Thread                               extractorThread     = null;
+    private DataSource                           dataSource;
+    private KeyPosition                          position;
+    private volatile ExtractStatus               status              = ExtractStatus.NORMAL;
+    private RunMode                              runMode;
+
+    public KeyRecordExtractor(MigrationTable table, DataSource dataSource, KeyPosition position, int crawSize,
+                              RunMode runMode){
+        this.table = table;
+        this.dataSource = dataSource;
+        this.position = position;
+        this.crawSize = crawSize;
+        this.runMode = runMode;
+    }
+
     @Override
     public void start() {
         super.start();
+        setExtractSQL();
+        setMinimumKeySQL();
+
+        queue = new LinkedBlockingQueue<>(crawSize * 2);
+        extractorThread = new NamedThreadFactory(this.getClass().getSimpleName() + "-" + table.getFullName())
+            .newThread(new ResumableExtractor(this, queue, dataSource, position, table, crawSize));
+        extractorThread.start();
+    }
+
+    protected void setExtractSQL() {
+        if (StringUtils.isBlank(extractSQL)) {
+            String colStr = StringUtils.join(table.getColumnNames(), ",");
+            extractSQL = new MessageFormat(extractSQLFormat)
+                .format(new Object[] { colStr, table.getSchema(), table.getName(), table.getPrimaryKeys().get(0),
+                                       table.getPrimaryKeys().get(0) });
+        }
+    }
+
+    protected void setMinimumKeySQL() {
+        if (StringUtils.isBlank(minimumKeySQL)) {
+            minimumKeySQL = new MessageFormat(minimumKeySQLFormat)
+                .format(new Object[] { table.getPrimaryKeys().get(0), table.getSchema(), table.getName() });
+        }
     }
 
     @Override
     public List<MigrationRecord> extract() throws CanalException {
-        return null;
+        List<MigrationRecord> rs = Lists.newArrayListWithCapacity(this.crawSize);
+        for (int i = 0; i < crawSize; i++) {
+            MigrationRecord r = queue.poll();
+            if (r != null) {
+                rs.add(r);
+            } else if (status() == ExtractStatus.TABLE_END) {
+                // check again
+                MigrationRecord r1 = queue.poll();
+                if (r1 != null) {
+                    rs.add(r1);
+                } else {
+                    // no record actually,break the loop
+                    break;
+                }
+            } else {
+                // poll no record , reduce the iterator ,try again
+                i--;
+                continue;
+            }
+        }
+
+        return rs;
+    }
+
+    @Override
+    public KeyPosition ack(List<MigrationRecord> records) throws CanalException {
+        if (records != null && records.size() != 0) {
+            MigrationRecord r = records.get(records.size() - 1);
+            if (this.position == null || this.runMode == RunMode.ETL) {
+                this.position = new KeyPosition();
+            }
+            // set current progress status
+            position.setCurrent(ProgressStatus.ETLING);
+
+            // set last key
+            List<ColumnValue> pks = r.getPrimaryKeys();
+            if (pks != null && pks.size() != 0) {
+                Object key = pks.get(0).getValue();
+                if (key instanceof Number) {
+                    position.setKey((Number) key);
+                }
+            }
+
+            return position;
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public ExtractStatus status() {
+        return status;
     }
 
     @Override
     public void stop() {
         super.stop();
+        extractorThread.interrupt();
+        try {
+            extractorThread.join(2 * 1000);
+        } catch (InterruptedException e) {
+            // ignore
+        }
+    }
+
+    public String getMinimumKeySQL() {
+        return minimumKeySQL;
+    }
+
+    public String getExtractSQL() {
+        return extractSQL;
     }
 }

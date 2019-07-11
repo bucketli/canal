@@ -1,4 +1,4 @@
-package com.alibaba.otter.canal.migration.model;
+package com.alibaba.otter.canal.migration.process;
 
 /**
  * @author bucketli 2019-07-04 07:44

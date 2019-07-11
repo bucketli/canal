@@ -1,5 +1,6 @@
 package com.alibaba.otter.canal.migration.model;
 
+import com.alibaba.otter.canal.migration.process.ProgressStatus;
 import com.google.common.collect.Lists;
 
 import java.io.Serializable;

@@ -17,9 +17,10 @@ public class MigrationTable {
     private String           name;
     private List<ColumnMeta> primaryKeys = Lists.newArrayList();
     /**
-     * not contain the primaryKeys;
+     * contain the primaryKeys;
      */
     private List<ColumnMeta> columns     = Lists.newArrayList();
+    private List<String>     columnNames = Lists.newArrayList();
 
     public MigrationTable(String type, String schema, String name){
         this.type = type;
@@ -27,13 +28,18 @@ public class MigrationTable {
         this.name = name;
     }
 
-    public MigrationTable(String type, String schema, String name, List<ColumnMeta> primaryKeys,
-                          List<ColumnMeta> columns){
+    public MigrationTable(String type, String schema, String name, List<ColumnMeta> columns){
         this.type = type;
         this.schema = schema;
         this.name = name;
-        this.primaryKeys = primaryKeys;
         this.columns = columns;
+
+        for (ColumnMeta cm : columns) {
+            columnNames.add(cm.getName());
+            if (cm.isPrimaryKey()) {
+                primaryKeys.add(cm);
+            }
+        }
     }
 
     public String getType() {
@@ -64,27 +70,24 @@ public class MigrationTable {
         return primaryKeys;
     }
 
-    public void setPrimaryKeys(List<ColumnMeta> primaryKeys) {
-        this.primaryKeys = primaryKeys;
-    }
-
     public List<ColumnMeta> getColumns() {
         return columns;
     }
 
-    public void setColumns(List<ColumnMeta> columns) {
-        this.columns = columns;
+    public List<String> getColumnNames() {
+        return columnNames;
     }
 
-    /**
-     * get all columns,include primaryKeys
-     * 
-     * @return
-     */
-    public List<ColumnMeta> getAllColumns() {
-        List<ColumnMeta> c = Lists.newArrayList(primaryKeys);
-        c.addAll(columns);
-        return c;
+    public void setColumns(List<ColumnMeta> columns) {
+        this.columns = columns;
+        primaryKeys = Lists.newArrayList();
+        columnNames= Lists.newArrayList();
+        for (ColumnMeta cm : columns) {
+            columnNames.add(cm.getName());
+            if (cm.isPrimaryKey()) {
+                primaryKeys.add(cm);
+            }
+        }
     }
 
     /**
@@ -111,7 +114,6 @@ public class MigrationTable {
         if (!type.equals(that.type)) return false;
         if (!schema.equals(that.schema)) return false;
         if (!name.equals(that.name)) return false;
-        if (!primaryKeys.equals(that.primaryKeys)) return false;
         return columns.equals(that.columns);
     }
 
@@ -120,7 +122,6 @@ public class MigrationTable {
         int result = type.hashCode();
         result = 31 * result + schema.hashCode();
         result = 31 * result + name.hashCode();
-        result = 31 * result + primaryKeys.hashCode();
         result = 31 * result + columns.hashCode();
         return result;
     }

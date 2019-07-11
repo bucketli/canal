@@ -12,12 +12,18 @@ import java.util.Objects;
  */
 public class ColumnMeta {
 
-    private String name;
-    private int    type;
+    private String  name;
+    private int     type;
+    private boolean isPrimaryKey = false;
 
     public ColumnMeta(String columnName, int columnType){
+        this(columnName, columnType, false);
+    }
+
+    public ColumnMeta(String columnName, int columnType, boolean isPrimaryKey){
         this.name = StringUtils.upperCase(columnName);
         this.type = columnType;
+        this.isPrimaryKey = isPrimaryKey;
     }
 
     public String getName() {
@@ -41,21 +47,11 @@ public class ColumnMeta {
         return ToStringBuilder.reflectionToString(this, ToStringStyle.DEFAULT_STYLE);
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        ColumnMeta that = (ColumnMeta) o;
-
-        if (type != that.type) return false;
-        return name.equals(that.name);
+    public boolean isPrimaryKey() {
+        return isPrimaryKey;
     }
 
-    @Override
-    public int hashCode() {
-        int result = name.hashCode();
-        result = 31 * result + type;
-        return result;
+    public void setPrimaryKey(boolean primaryKey) {
+        isPrimaryKey = primaryKey;
     }
 }
