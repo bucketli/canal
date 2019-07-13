@@ -8,7 +8,7 @@ import com.alibaba.otter.canal.migration.model.KeyPosition;
  * @author bucketli 2019/7/8 1:35 PM
  * @since 1.1.3
  **/
-public interface RecordPositioner {
+public interface RecordPositioner extends CanalLifeCycle{
 
     public KeyPosition getLast();
 

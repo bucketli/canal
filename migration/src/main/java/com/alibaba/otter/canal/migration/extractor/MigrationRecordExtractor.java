@@ -1,6 +1,7 @@
 package com.alibaba.otter.canal.migration.extractor;
 
 import com.alibaba.otter.canal.common.CanalException;
+import com.alibaba.otter.canal.common.CanalLifeCycle;
 import com.alibaba.otter.canal.migration.model.KeyPosition;
 import com.alibaba.otter.canal.migration.model.MigrationRecord;
 import com.alibaba.otter.canal.migration.process.ExtractStatus;
@@ -11,7 +12,7 @@ import java.util.List;
  * @author bucketli 2019-06-30 11:04
  * @since 1.1.3
  */
-public interface MigrationRecordExtractor {
+public interface MigrationRecordExtractor extends CanalLifeCycle {
 
     /**
      * extract data from DataSource

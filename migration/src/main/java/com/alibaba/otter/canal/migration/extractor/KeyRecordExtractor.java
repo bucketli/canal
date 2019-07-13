@@ -29,14 +29,15 @@ public class KeyRecordExtractor extends AbstractCanalLifeCycle implements Migrat
     private static final String                  minimumKeySQLFormat = "select min(`{0}`) form `{1}`.`{2}`";
     private String                               minimumKeySQL;
     private String                               extractSQL;
-    private MigrationTable                       table;
-    private LinkedBlockingQueue<MigrationRecord> queue;
-    private int                                  crawSize;
-    private Thread                               extractorThread     = null;
-    private DataSource                           dataSource;
-    private KeyPosition                          position;
+
+    private final MigrationTable                 table;
+    private final int                            crawSize;
+    private final DataSource                     dataSource;
+    private final KeyPosition                    position;
+
     private volatile ExtractStatus               status              = ExtractStatus.NORMAL;
-    private RunMode                              runMode;
+    private Thread                               extractorThread     = null;
+    private LinkedBlockingQueue<MigrationRecord> queue;
 
     public KeyRecordExtractor(MigrationTable table, DataSource dataSource, KeyPosition position, int crawSize,
                               RunMode runMode){
@@ -44,7 +45,6 @@ public class KeyRecordExtractor extends AbstractCanalLifeCycle implements Migrat
         this.dataSource = dataSource;
         this.position = position;
         this.crawSize = crawSize;
-        this.runMode = runMode;
     }
 
     @Override
@@ -105,9 +105,7 @@ public class KeyRecordExtractor extends AbstractCanalLifeCycle implements Migrat
     public KeyPosition ack(List<MigrationRecord> records) throws CanalException {
         if (records != null && records.size() != 0) {
             MigrationRecord r = records.get(records.size() - 1);
-            if (this.position == null || this.runMode == RunMode.ETL) {
-                this.position = new KeyPosition();
-            }
+
             // set current progress status
             position.setCurrent(ProgressStatus.ETLING);
 

@@ -10,9 +10,9 @@ import java.util.concurrent.Semaphore;
  **/
 public class TableController {
 
-    private CountDownLatch                         latch;
-    private Semaphore                              sem;
-    private LinkedBlockingQueue<MigrationInstance> queue = new LinkedBlockingQueue<MigrationInstance>();
+    private CountDownLatch                     latch;
+    private Semaphore                          sem;
+    private LinkedBlockingQueue<MigrationUnit> queue = new LinkedBlockingQueue<MigrationUnit>();
 
     public TableController(int total, int concurrent){
         this.latch = new CountDownLatch(total);
@@ -23,13 +23,13 @@ public class TableController {
         sem.acquire();
     }
 
-    public void release(MigrationInstance instance) {
+    public void release(MigrationUnit instance) {
         sem.release();
         queue.offer(instance);
         latch.countDown();
     }
 
-    public MigrationInstance takeDone() throws InterruptedException {
+    public MigrationUnit takeDone() throws InterruptedException {
         return queue.take();
     }
 

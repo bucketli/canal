@@ -9,6 +9,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import com.alibaba.otter.canal.migration.controller.MigrationUnit;
 import com.alibaba.otter.canal.migration.utils.ExecutorTemplate;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.MDC;
@@ -32,7 +33,6 @@ import javax.xml.crypto.Data;
  */
 public class BatchRecordApplier extends AbstractCanalLifeCycle implements MigrationRecordApplier {
 
-    public static final String  MDC_APPLIER_TABLE_KEY = "table";
     private static final String applySQLFormat        = "insert into `{0}`({1}) values ({2})";
     private int                 threadSize            = Runtime.getRuntime().availableProcessors() * 2;
     private int                 splitSize             = 100;
@@ -111,7 +111,7 @@ public class BatchRecordApplier extends AbstractCanalLifeCycle implements Migrat
                     public void run() {
                         String name = Thread.currentThread().getName();
                         try {
-                            MDC.put(MDC_APPLIER_TABLE_KEY, table.getName());
+                            MDC.put(MigrationUnit.MDC_TABLE_KEY, table.getName());
                             Thread.currentThread().setName(executorName);
                             JdbcTemplate template1 = new JdbcTemplate(dataSource);
                             batchApply(template1, records);
