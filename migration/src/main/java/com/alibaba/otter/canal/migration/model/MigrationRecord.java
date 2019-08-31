@@ -5,6 +5,7 @@ import com.alibaba.otter.canal.migration.metadata.ColumnValue;
 import com.google.common.collect.Lists;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * @author bucketli 2019-06-30 11:06
@@ -52,6 +53,7 @@ public class MigrationRecord {
      * @return
      */
     private ColumnValue getColumnByName(String columnName, boolean returnNullIfNotExist) {
+        ColumnValue r = null;
         for (ColumnValue c : columns) {
             if (c.getColumn().getName().equalsIgnoreCase(columnName)) {
                 return c;
@@ -75,14 +77,8 @@ public class MigrationRecord {
         MigrationRecord r = new MigrationRecord();
         r.setSchemaName(schemaName);
         r.setTableName(tableName);
-        for (ColumnValue c : primaryKeys) {
-            r.addPrimaryKey(c.clone());
-        }
-
-        for (ColumnValue c : columns) {
-            r.addColumn(c.clone());
-        }
-
+        primaryKeys.forEach((c) -> r.addPrimaryKey(c.clone()));
+        columns.forEach((c) -> r.addColumn(c.clone()));
         return r;
     }
 

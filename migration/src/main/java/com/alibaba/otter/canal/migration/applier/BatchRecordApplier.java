@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import com.alibaba.otter.canal.migration.controller.MigrationUnit;
 import com.alibaba.otter.canal.migration.utils.ExecutorTemplate;
@@ -33,9 +34,9 @@ import javax.xml.crypto.Data;
  */
 public class BatchRecordApplier extends AbstractCanalLifeCycle implements MigrationRecordApplier {
 
-    private static final String applySQLFormat        = "insert into `{0}`({1}) values ({2})";
-    private int                 threadSize            = Runtime.getRuntime().availableProcessors() * 2;
-    private int                 splitSize             = 100;
+    private static final String applySQLFormat = "insert into `{0}`({1}) values ({2})";
+    private int                 threadSize     = Runtime.getRuntime().availableProcessors() * 2;
+    private int                 batchSize      = 100;
     private ThreadPoolExecutor  executor;
     private String              executorName;
     private MigrationTable      table;
@@ -45,10 +46,10 @@ public class BatchRecordApplier extends AbstractCanalLifeCycle implements Migrat
     private BatchRecordApplier(){
     };
 
-    public BatchRecordApplier(int threadSize, int splitSize, ThreadPoolExecutor executor, DataSource dataSource,
+    public BatchRecordApplier(int threadSize, int batchSize, ThreadPoolExecutor executor, DataSource dataSource,
                               MigrationTable table){
         this.threadSize = threadSize;
-        this.splitSize = splitSize;
+        this.batchSize = batchSize;
         this.executor = executor;
         this.table = table;
         this.dataSource = dataSource;
@@ -98,26 +99,22 @@ public class BatchRecordApplier extends AbstractCanalLifeCycle implements Migrat
             return;
         }
 
-        if (records.size() > splitSize) {
+        if (records.size() > batchSize) {
             ExecutorTemplate template = new ExecutorTemplate(executor);
             int index = 0;
             int size = records.size();
             for (; index < size;) {
-                int end = (index + splitSize > size) ? size : (index + splitSize);
+                int end = (index + batchSize > size) ? size : (index + batchSize);
                 final List<MigrationRecord> subList = records.subList(index, end);
-                template.submit(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        String name = Thread.currentThread().getName();
-                        try {
-                            MDC.put(MigrationUnit.MDC_TABLE_KEY, table.getName());
-                            Thread.currentThread().setName(executorName);
-                            JdbcTemplate template1 = new JdbcTemplate(dataSource);
-                            batchApply(template1, records);
-                        } finally {
-                            Thread.currentThread().setName(name);
-                        }
+                template.submit(() -> {
+                    String name = Thread.currentThread().getName();
+                    try {
+                        MDC.put(MigrationUnit.MDC_TABLE_KEY, table.getName());
+                        Thread.currentThread().setName(executorName);
+                        JdbcTemplate template1 = new JdbcTemplate(dataSource);
+                        batchApply(template1, records);
+                    } finally {
+                        Thread.currentThread().setName(name);
                     }
                 });
             }

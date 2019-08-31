@@ -54,13 +54,9 @@ public class FileBasedRecordPositioner extends AbstractCanalLifeCycle implements
 
         positionFile = new File(positionDir, positionFileName);
         executor = Executors.newSingleThreadScheduledExecutor();
-        executor.scheduleAtFixedRate(new Runnable() {
-
-            @Override
-            public void run() {
-                if (needFlush.compareAndSet(true, false)) {
-                    flushToFile(positionFile, getLast());
-                }
+        executor.scheduleAtFixedRate(() -> {
+            if (needFlush.compareAndSet(true, false)) {
+                flushToFile(positionFile, getLast());
             }
         }, period, period, TimeUnit.MILLISECONDS);
     }
@@ -107,5 +103,17 @@ public class FileBasedRecordPositioner extends AbstractCanalLifeCycle implements
         } catch (IOException e) {
             throw new CanalException(e);
         }
+    }
+
+    public void setPositionDir(File positionDir) {
+        this.positionDir = positionDir;
+    }
+
+    public void setPositionFileName(String positionFileName) {
+        this.positionFileName = positionFileName;
+    }
+
+    public void setPeriod(long period) {
+        this.period = period;
     }
 }

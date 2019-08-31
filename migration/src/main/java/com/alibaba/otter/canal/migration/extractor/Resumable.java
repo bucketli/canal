@@ -7,6 +7,7 @@ import com.alibaba.otter.canal.migration.metadata.ColumnValue;
 import com.alibaba.otter.canal.migration.metadata.MigrationTable;
 import com.alibaba.otter.canal.migration.model.KeyPosition;
 import com.alibaba.otter.canal.migration.model.MigrationRecord;
+import com.alibaba.otter.canal.migration.process.ExtractStatus;
 import com.alibaba.otter.canal.migration.process.ProgressStatus;
 import com.google.common.collect.Lists;
 import org.slf4j.Logger;
@@ -25,20 +26,20 @@ import java.util.concurrent.BlockingQueue;
  * @author bucketli 2019/7/8 2:52 PM
  * @since 1.1.3
  **/
-public class ResumableExtractor extends AbstractCanalLifeCycle implements Runnable {
+public class Resumable extends AbstractCanalLifeCycle implements Runnable {
 
-    private static final Logger            logger  = LoggerFactory.getLogger(ResumableExtractor.class);
-    private KeyRecordExtractor             keyRecordExtractor;
-    private JdbcTemplate                   jdbcTemplate;
-    private Object                         id      = 0L;
-    private BlockingQueue<MigrationRecord> queue;
-    private volatile boolean               running = true;
-    private MigrationTable                 table;
-    private int                            crawSize;
+    private static final Logger                         logger  = LoggerFactory.getLogger(Resumable.class);
+    private              FullRecordExtractor            fullRecordExtractor;
+    private              JdbcTemplate                   jdbcTemplate;
+    private              Object                         id      = 0L;
+    private              BlockingQueue<MigrationRecord> queue;
+    private volatile     boolean                        running = true;
+    private              MigrationTable                 table;
+    private              int                            crawSize;
 
-    public ResumableExtractor(KeyRecordExtractor keyRecordExtractor, BlockingQueue<MigrationRecord> queue,
-                              DataSource dataSource, KeyPosition position, MigrationTable table, int crawSize){
-        this.keyRecordExtractor = keyRecordExtractor;
+    public Resumable(FullRecordExtractor fullRecordExtractor, BlockingQueue<MigrationRecord> queue,
+                     DataSource dataSource, KeyPosition position, MigrationTable table, int crawSize){
+        this.fullRecordExtractor = fullRecordExtractor;
         this.queue = queue;
         this.table = table;
         this.crawSize = crawSize;
@@ -61,9 +62,9 @@ public class ResumableExtractor extends AbstractCanalLifeCycle implements Runnab
 
     private Object getMinId() {
         Assert.notNull(jdbcTemplate);
-        Assert.notNull(keyRecordExtractor.getMinimumKeySQL());
+        Assert.notNull(fullRecordExtractor.getMinimumKeySQL());
 
-        Object min = jdbcTemplate.execute(keyRecordExtractor.getMinimumKeySQL(), (PreparedStatementCallback) ps -> {
+        Object min = jdbcTemplate.execute(fullRecordExtractor.getMinimumKeySQL(), (PreparedStatementCallback) ps -> {
             ResultSet rs = ps.executeQuery();
             Object re = null;
             while (rs.next()) {
@@ -94,7 +95,7 @@ public class ResumableExtractor extends AbstractCanalLifeCycle implements Runnab
     @Override
     public void run() {
         while (running) {
-            jdbcTemplate.execute(keyRecordExtractor.getExtractSQL(), (PreparedStatementCallback) ps -> {
+            jdbcTemplate.execute(fullRecordExtractor.getExtractSQL(), (PreparedStatementCallback) ps -> {
                 ps.setObject(1, id);
                 ps.setInt(2, crawSize);
                 ps.setFetchSize(200);
@@ -110,6 +111,8 @@ public class ResumableExtractor extends AbstractCanalLifeCycle implements Runnab
                         cms.add(cv);
                         if (col.isPrimaryKey()) {
                             pks.add(cv);
+
+                            id = cv.getValue();
                         }
                     }
 
@@ -118,7 +121,7 @@ public class ResumableExtractor extends AbstractCanalLifeCycle implements Runnab
                 }
 
                 if (result.size() < 1) {
-                    // TODO
+                    fullRecordExtractor.setStatus(ExtractStatus.TABLE_END);
                     running = false;
                 }
 

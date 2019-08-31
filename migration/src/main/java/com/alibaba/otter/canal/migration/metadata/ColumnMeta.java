@@ -16,10 +16,6 @@ public class ColumnMeta {
     private int     type;
     private boolean isPrimaryKey = false;
 
-    public ColumnMeta(String columnName, int columnType){
-        this(columnName, columnType, false);
-    }
-
     public ColumnMeta(String columnName, int columnType, boolean isPrimaryKey){
         this.name = StringUtils.upperCase(columnName);
         this.type = columnType;

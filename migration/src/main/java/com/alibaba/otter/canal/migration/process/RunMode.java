@@ -21,6 +21,11 @@ public enum RunMode {
     ETL,
 
     /**
+     * check data
+     */
+    CHECK,
+
+    /**
      * automatic run all phase
      */
     ALL;
@@ -37,7 +42,12 @@ public enum RunMode {
         return this == RunMode.ETL;
     }
 
+    public boolean isCheck(){
+        return this == RunMode.CHECK;
+    }
+
     public boolean isAll(){
         return this == RunMode.ALL;
     }
+
 }

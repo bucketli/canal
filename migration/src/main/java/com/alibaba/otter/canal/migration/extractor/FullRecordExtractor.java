@@ -14,6 +14,7 @@ import com.alibaba.otter.canal.migration.model.MigrationRecord;
 import com.alibaba.otter.canal.migration.process.ExtractStatus;
 import com.alibaba.otter.canal.migration.process.ProgressStatus;
 import com.alibaba.otter.canal.migration.process.RunMode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang.StringUtils;
 
@@ -23,7 +24,7 @@ import javax.sql.DataSource;
  * @author bucketli 2019-06-30 11:01
  * @since 1.1.3
  */
-public class KeyRecordExtractor extends AbstractCanalLifeCycle implements MigrationRecordExtractor {
+public class FullRecordExtractor extends AbstractCanalLifeCycle implements MigrationRecordExtractor {
 
     private static final String                  extractSQLFormat    = "select `{0}` from `{1}`.`{2}` where `{3}` > ? order by `{4}` limit ?";
     private static final String                  minimumKeySQLFormat = "select min(`{0}`) form `{1}`.`{2}`";
@@ -39,8 +40,8 @@ public class KeyRecordExtractor extends AbstractCanalLifeCycle implements Migrat
     private Thread                               extractorThread     = null;
     private LinkedBlockingQueue<MigrationRecord> queue;
 
-    public KeyRecordExtractor(MigrationTable table, DataSource dataSource, KeyPosition position, int crawSize,
-                              RunMode runMode){
+    public FullRecordExtractor(MigrationTable table, DataSource dataSource, KeyPosition position, int crawSize,
+                               RunMode runMode){
         this.table = table;
         this.dataSource = dataSource;
         this.position = position;
@@ -55,24 +56,24 @@ public class KeyRecordExtractor extends AbstractCanalLifeCycle implements Migrat
 
         queue = new LinkedBlockingQueue<>(crawSize * 2);
         extractorThread = new NamedThreadFactory(this.getClass().getSimpleName() + "-" + table.getFullName())
-            .newThread(new ResumableExtractor(this, queue, dataSource, position, table, crawSize));
+            .newThread(new Resumable(this, queue, dataSource, position, table, crawSize));
         extractorThread.start();
     }
 
     protected void setExtractSQL() {
-        if (StringUtils.isBlank(extractSQL)) {
-            String colStr = StringUtils.join(table.getColumnNames(), ",");
-            extractSQL = new MessageFormat(extractSQLFormat)
-                .format(new Object[] { colStr, table.getSchema(), table.getName(), table.getPrimaryKeys().get(0),
-                                       table.getPrimaryKeys().get(0) });
-        }
+        Preconditions.checkArgument(StringUtils.isNotBlank(extractSQL),
+            "extractSQL already be set,sql is:" + extractSQL);
+        String colStr = StringUtils.join(table.getColumnNames(), ",");
+        extractSQL = new MessageFormat(extractSQLFormat)
+            .format(new Object[] { colStr, table.getSchema(), table.getName(), table.getPrimaryKeys().get(0),
+                                   table.getPrimaryKeys().get(0) });
     }
 
     protected void setMinimumKeySQL() {
-        if (StringUtils.isBlank(minimumKeySQL)) {
-            minimumKeySQL = new MessageFormat(minimumKeySQLFormat)
-                .format(new Object[] { table.getPrimaryKeys().get(0), table.getSchema(), table.getName() });
-        }
+        Preconditions.checkArgument(StringUtils.isNotBlank(minimumKeySQL),
+            "minimumKeySQL already be set,sql is :" + minimumKeySQL);
+        minimumKeySQL = new MessageFormat(minimumKeySQLFormat)
+            .format(new Object[] { table.getPrimaryKeys().get(0), table.getSchema(), table.getName() });
     }
 
     @Override
@@ -127,6 +128,10 @@ public class KeyRecordExtractor extends AbstractCanalLifeCycle implements Migrat
     @Override
     public ExtractStatus status() {
         return status;
+    }
+
+    public void setStatus(ExtractStatus status) {
+        this.status = status;
     }
 
     @Override
