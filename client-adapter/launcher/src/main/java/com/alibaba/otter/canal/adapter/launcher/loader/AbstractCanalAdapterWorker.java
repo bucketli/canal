@@ -151,6 +151,9 @@ public abstract class AbstractCanalAdapterWorker {
                     if (flatMessage) {
                         // batch write
                         writeOut((List<FlatMessage>) messages);
+                        // FIXME xxx
+                        // messages.forEach((message ->
+                        // System.out.println(JSON.toJSONString(message))));
                     } else {
                         for (final Object message : messages) {
                             writeOut((Message) message);
