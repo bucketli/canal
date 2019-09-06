@@ -236,9 +236,9 @@ public class MigrationController extends AbstractCanalLifeCycle {
                         .filter(t -> !isBlackTable(t.getName(), tableBlackList)
                                      && !isBlackTable(t.getFullName(), tableBlackList))
                         .forEach(t -> {
-                            TableMetaGenerator.buildColumns(sourceDataSource, t);
-                            if (!rTables.contains(t)) {
-                                rTables.add(t);
+                            TableMetaGenerator.buildColumns(sourceDataSource, (MigrationTable) t);
+                            if (!rTables.contains((MigrationTable) t)) {
+                                rTables.add((MigrationTable) t);
                             }
                         });
                 }
@@ -250,9 +250,9 @@ public class MigrationController extends AbstractCanalLifeCycle {
                 .filter(
                     t -> !isBlackTable(t.getName(), tableBlackList) && !isBlackTable(t.getFullName(), tableBlackList))
                 .forEach(t -> {
-                    TableMetaGenerator.buildColumns(sourceDataSource, t);
-                    if (!rTables.contains(t)) {
-                        rTables.add(t);
+                    TableMetaGenerator.buildColumns(sourceDataSource, (MigrationTable) t);
+                    if (!rTables.contains((MigrationTable)t)) {
+                        rTables.add((MigrationTable)t);
                     }
                 });
         }
