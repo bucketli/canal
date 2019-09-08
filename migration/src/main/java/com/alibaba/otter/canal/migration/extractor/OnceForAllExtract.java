@@ -29,29 +29,29 @@ import com.google.common.collect.Lists;
  **/
 public class OnceForAllExtract extends AbstractCanalLifeCycle implements Runnable {
 
-    private static final Logger            logger           = LoggerFactory.getLogger(OnceForAllExtract.class);
+    private static final Logger logger           = LoggerFactory.getLogger(OnceForAllExtract.class);
 
-    private static final String            extractSQLFormat = "select `{0}` from `{1}`.`{2}`";
-    private String                         extractSQL;
-    private FullRecordExtractor            fullRecordExtractor;
-    private JdbcTemplate                   jdbcTemplate;
-    private Object                         id               = 0L;
-    private BlockingQueue<MigrationRecord> queue;
-    private volatile boolean               running          = true;
-    private MigrationTable                 table;
-    private int                            crawSize;
+    private static final String extractSQLFormat = "select `{0}` from `{1}`.`{2}`";
+    private String              extractSQL;
+    private FullRecordExtractor fullRecordExtractor;
+    private JdbcTemplate        jdbcTemplate;
+    private volatile boolean    extracting;
+    private MigrationTable      table;
+    private int                 crawSize;
 
-    public OnceForAllExtract(FullRecordExtractor fullRecordExtractor, BlockingQueue<MigrationRecord> queue,
-                             DataSource dataSource, MigrationTable table, int crawSize){
+    public OnceForAllExtract(FullRecordExtractor fullRecordExtractor){
         this.fullRecordExtractor = fullRecordExtractor;
-        this.queue = queue;
-        this.table = table;
-        this.crawSize = crawSize;
-        jdbcTemplate = new JdbcTemplate(dataSource);
+        this.table = fullRecordExtractor.getTable();
+        this.crawSize = fullRecordExtractor.getCrawSize();
+        jdbcTemplate = new JdbcTemplate(fullRecordExtractor.getDataSource());
+    }
+
+    @Override
+    public void start() {
+        super.start();
 
         setExtractSQL();
-
-        logger.info(table.getFullName() + " start , position :" + id);
+        extracting = true;
     }
 
     protected void setExtractSQL() {
@@ -65,7 +65,7 @@ public class OnceForAllExtract extends AbstractCanalLifeCycle implements Runnabl
 
     @Override
     public void run() {
-        while (running) {
+        while (extracting) {
             jdbcTemplate.execute(this.extractSQL, (PreparedStatementCallback<Object>) ps -> {
                 ps.setFetchSize(200);
                 ResultSet rs = ps.executeQuery();
@@ -82,7 +82,7 @@ public class OnceForAllExtract extends AbstractCanalLifeCycle implements Runnabl
                     MigrationRecord r = new MigrationRecord(table.getSchema(), table.getName(), new ArrayList<>(), cms);
                     result.add(r);
 
-                    if(result.size() >= crawSize){
+                    if (result.size() >= crawSize) {
                         fullRecordExtractor.putResultToQueue(result);
                         result = Lists.newArrayListWithCapacity(crawSize);
                     }
@@ -90,12 +90,20 @@ public class OnceForAllExtract extends AbstractCanalLifeCycle implements Runnabl
 
                 if (result.size() < 1) {
                     fullRecordExtractor.setStatus(ExtractStatus.TABLE_END);
-                    running = false;
+                    extracting = false;
                 }
 
                 fullRecordExtractor.putResultToQueue(result);
                 return null;
             });
         }
+    }
+
+    protected BlockingQueue<MigrationRecord> getQueue() {
+        return fullRecordExtractor.getQueue();
+    }
+
+    protected boolean isExtracting() {
+        return extracting;
     }
 }

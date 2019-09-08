@@ -38,19 +38,23 @@ public class FullRecordExtractor extends AbstractCanalLifeCycle implements Migra
         this.dataSource = dataSource;
         this.position = position;
         this.crawSize = crawSize;
+        queue = new LinkedBlockingQueue<>(crawSize * 2);
     }
 
     @Override
     public void start() {
         super.start();
 
-        queue = new LinkedBlockingQueue<>(crawSize * 2);
         if (table.getPrimaryKeys().size() == 1) {
+            ResumableExtract extract = new ResumableExtract(this);
+            extract.start();
             extractorThread = new NamedThreadFactory(this.getClass().getSimpleName() + "-" + table.getFullName())
-                .newThread(new ResumableExtract(this, queue, dataSource, position, table, crawSize));
+                .newThread(extract);
         } else {
+            OnceForAllExtract extract = new OnceForAllExtract(this);
+            extract.start();
             extractorThread = new NamedThreadFactory(this.getClass().getSimpleName() + "-" + table.getFullName())
-                .newThread(new OnceForAllExtract(this, queue, dataSource, table, crawSize));
+                .newThread(extract);
         }
 
         extractorThread.start();
@@ -82,7 +86,7 @@ public class FullRecordExtractor extends AbstractCanalLifeCycle implements Migra
         return rs;
     }
 
-    public void putResultToQueue(List<MigrationRecord> result){
+    public void putResultToQueue(List<MigrationRecord> result) {
         for (MigrationRecord r : result) {
             try {
                 queue.put(r);
@@ -91,6 +95,26 @@ public class FullRecordExtractor extends AbstractCanalLifeCycle implements Migra
                 throw new CanalException(e);
             }
         }
+    }
+
+    public LinkedBlockingQueue<MigrationRecord> getQueue() {
+        return queue;
+    }
+
+    public DataSource getDataSource() {
+        return dataSource;
+    }
+
+    public KeyPosition getPosition() {
+        return position;
+    }
+
+    public MigrationTable getTable() {
+        return table;
+    }
+
+    public int getCrawSize() {
+        return crawSize;
     }
 
     @Override

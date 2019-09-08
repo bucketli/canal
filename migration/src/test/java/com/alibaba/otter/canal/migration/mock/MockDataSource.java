@@ -32,27 +32,33 @@ import static org.mockito.Mockito.*;
 /**
  * @author Brett Wooldridge
  */
-public class MockDataSource implements DataSource {
+public abstract class MockDataSource implements DataSource {
 
-    @Override public Connection getConnection() throws SQLException {
-        return createMockConnection();
+    @Override
+    public Connection getConnection() throws SQLException {
+        return mockConnection();
     }
 
-    @Override public Connection getConnection(String username, String password) throws SQLException {
+    @Override
+    public Connection getConnection(String username, String password) throws SQLException {
         return getConnection();
     }
 
-    @Override public PrintWriter getLogWriter() throws SQLException {
+    @Override
+    public PrintWriter getLogWriter() throws SQLException {
         return null;
     }
 
-    @Override public void setLogWriter(PrintWriter out) throws SQLException {
+    @Override
+    public void setLogWriter(PrintWriter out) throws SQLException {
     }
 
-    @Override public void setLoginTimeout(int seconds) throws SQLException {
+    @Override
+    public void setLoginTimeout(int seconds) throws SQLException {
     }
 
-    @Override public int getLoginTimeout() throws SQLException {
+    @Override
+    public int getLoginTimeout() throws SQLException {
         return 0;
     }
 
@@ -60,90 +66,130 @@ public class MockDataSource implements DataSource {
         return null;
     }
 
-    @Override public <T> T unwrap(Class<T> iface) throws SQLException {
+    @Override
+    public <T> T unwrap(Class<T> iface) throws SQLException {
         return null;
     }
 
-    @Override public boolean isWrapperFor(Class<?> iface) throws SQLException {
+    @Override
+    public boolean isWrapperFor(Class<?> iface) throws SQLException {
         return false;
     }
 
-    public static Connection createMockConnection() throws SQLException {
-        // Setup mock connection
-        final Connection mockConnection = mock(Connection.class);
+    public abstract Connection mockConnection() throws SQLException;
 
-        // Autocommit is always true by default
-        when(mockConnection.getAutoCommit()).thenReturn(true);
-
-        // Handle Connection.createStatement()
-        Statement statement = mock(Statement.class);
-        when(mockConnection.createStatement()).thenReturn(statement);
-        when(mockConnection.createStatement(anyInt(), anyInt())).thenReturn(statement);
-        when(mockConnection.createStatement(anyInt(), anyInt(), anyInt())).thenReturn(statement);
-        when(mockConnection.isValid(anyInt())).thenReturn(true);
-
-        // Handle Connection.prepareStatement()
-        PreparedStatement mockPreparedStatement = mock(PreparedStatement.class);
-        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
-        when(mockConnection.prepareStatement(anyString(), anyInt())).thenReturn(mockPreparedStatement);
-        when(mockConnection.prepareStatement(anyString(), any(int[].class))).thenReturn(mockPreparedStatement);
-        when(mockConnection.prepareStatement(anyString(), any(String[].class))).thenReturn(mockPreparedStatement);
-        when(mockConnection.prepareStatement(anyString(), anyInt(), anyInt())).thenReturn(mockPreparedStatement);
-        when(mockConnection.prepareStatement(anyString(), anyInt(), anyInt(), anyInt())).thenReturn(
-                mockPreparedStatement);
-        doAnswer(new Answer<Void>() {
-
-            @Override public Void answer(InvocationOnMock invocation) throws Throwable {
-                return null;
-            }
+    public PreparedStatement mockPrepareStatementCommon(PreparedStatement mockPreparedStatement) throws SQLException {
+        doAnswer((invocationOnMock) -> {
+            return null;
         }).doNothing().when(mockPreparedStatement).setInt(anyInt(), anyInt());
 
-        ResultSet mockResultSet = mock(ResultSet.class);
-        when(mockPreparedStatement.executeQuery()).thenReturn(mockResultSet);
-        when(statement.executeQuery(anyString())).thenReturn(mockResultSet);
-        when(mockResultSet.getString(anyInt())).thenReturn("aString");
+        doAnswer((invocationOnMock) -> {
+            return null;
+        }).doNothing().when(mockPreparedStatement).setString(anyInt(), anyString());
+
+        doAnswer((invocationOnMock) -> {
+            return null;
+        }).doNothing().when(mockPreparedStatement).setObject(anyInt(), any());
+
+        doAnswer((invocationOnMock) -> {
+            return null;
+        }).doNothing().when(mockPreparedStatement).setDate(anyInt(), any());
+        return mockPreparedStatement;
+    }
+
+    protected int nextBatch  = 1;
+    private int   batchIndex = 0;
+
+    public ResultSet mockResultSetCommon(ResultSet mockResultSet, final int times) throws SQLException {
         when(mockResultSet.next()).thenAnswer(new Answer<Boolean>() {
 
-            int i = 0;
+            int boundary = times > 0 ? times : 1;
+            int i        = 0;
 
-            @Override public Boolean answer(InvocationOnMock invocationOnMock) throws Throwable {
-                System.out.println(i);
+            @Override
+            public Boolean answer(InvocationOnMock invocationOnMock) throws Throwable {
                 i++;
-                if (i >= 10) {
+
+                if (batchIndex >= nextBatch) {
+                    return false;
+                }
+
+                if (i > boundary) {
+                    batchIndex++;
+                    i = 0;
                     return false;
                 } else {
                     return true;
                 }
             }
         });
-        when(mockResultSet.getInt(anyInt())).thenReturn(10);
+
+        return mockResultSet;
+    }
+
+    public Connection mockConnectionCommon(Connection mockConnection, Statement mockStatement,
+                                           PreparedStatement mockPreparedStatement,
+                                           ResultSet mockResultSet) throws SQLException {
+        // Setup mock connection
+        // final Connection mockConnection = mock(Connection.class);
+
+        // Autocommit is always true by default
+        when(mockConnection.getAutoCommit()).thenReturn(true);
+
+        // Handle Connection.createStatement()
+        // Statement statement = mock(Statement.class);
+        when(mockConnection.createStatement()).thenReturn(mockStatement);
+        when(mockConnection.createStatement(anyInt(), anyInt())).thenReturn(mockStatement);
+        when(mockConnection.createStatement(anyInt(), anyInt(), anyInt())).thenReturn(mockStatement);
+        when(mockConnection.isValid(anyInt())).thenReturn(true);
+
+        // Handle Connection.prepareStatement()
+        // PreparedStatement mockPreparedStatement = mock(PreparedStatement.class);
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPreparedStatement);
+        when(mockConnection.prepareStatement(anyString(), anyInt())).thenReturn(mockPreparedStatement);
+        when(mockConnection.prepareStatement(anyString(), any(int[].class))).thenReturn(mockPreparedStatement);
+        when(mockConnection.prepareStatement(anyString(), any(String[].class))).thenReturn(mockPreparedStatement);
+        when(mockConnection.prepareStatement(anyString(), anyInt(), anyInt())).thenReturn(mockPreparedStatement);
+        when(mockConnection.prepareStatement(anyString(), anyInt(), anyInt(), anyInt()))
+            .thenReturn(mockPreparedStatement);
+
+        // ResultSet mockResultSet = mock(ResultSet.class);
+        when(mockPreparedStatement.executeQuery()).thenReturn(mockResultSet);
+        when(mockStatement.executeQuery(anyString())).thenReturn(mockResultSet);
+        // when(mockResultSet.getString(anyInt())).thenReturn("aString");
+        // when(mockResultSet.getInt(anyInt())).thenReturn(10);
 
         // Handle Connection.prepareCall()
-        CallableStatement mockCallableStatement = mock(CallableStatement.class);
-        when(mockConnection.prepareCall(anyString())).thenReturn(mockCallableStatement);
-        when(mockConnection.prepareCall(anyString(), anyInt(), anyInt())).thenReturn(mockCallableStatement);
-        when(mockConnection.prepareCall(anyString(), anyInt(), anyInt(), anyInt())).thenReturn(mockCallableStatement);
+        // CallableStatement mockCallableStatement = mock(CallableStatement.class);
+        // when(mockConnection.prepareCall(anyString())).thenReturn(mockCallableStatement);
+        // when(mockConnection.prepareCall(anyString(), anyInt(),
+        // anyInt())).thenReturn(mockCallableStatement);
+        // when(mockConnection.prepareCall(anyString(), anyInt(), anyInt(),
+        // anyInt())).thenReturn(mockCallableStatement);
 
         // Handle Connection.close()
-        //        doAnswer(new Answer<Void>() {
-        //            public Void answer(InvocationOnMock invocation) throws Throwable {
-        //                return null;
-        //            }
-        //        }).doThrow(new SQLException("Connection is already closed")).when(mockConnection).close();
+        // doAnswer(new Answer<Void>() {
+        // public Void answer(InvocationOnMock invocation) throws Throwable {
+        // return null;
+        // }
+        // }).doThrow(new SQLException("Connection is already
+        // closed")).when(mockConnection).close();
 
         // Handle Connection.commit()
-        //        doAnswer(new Answer<Void>() {
-        //            public Void answer(InvocationOnMock invocation) throws Throwable {
-        //                return null;
-        //            }
-        //        }).doThrow(new SQLException("Transaction already committed")).when(mockConnection).commit();
+        // doAnswer(new Answer<Void>() {
+        // public Void answer(InvocationOnMock invocation) throws Throwable {
+        // return null;
+        // }
+        // }).doThrow(new SQLException("Transaction already
+        // committed")).when(mockConnection).commit();
 
         // Handle Connection.rollback()
-        //        doAnswer(new Answer<Void>() {
-        //            public Void answer(InvocationOnMock invocation) throws Throwable {
-        //                return null;
-        //            }
-        //        }).doThrow(new SQLException("Transaction already rolledback")).when(mockConnection).rollback();
+        // doAnswer(new Answer<Void>() {
+        // public Void answer(InvocationOnMock invocation) throws Throwable {
+        // return null;
+        // }
+        // }).doThrow(new SQLException("Transaction already
+        // rolledback")).when(mockConnection).rollback();
 
         return mockConnection;
     }

@@ -30,33 +30,35 @@ import java.util.concurrent.BlockingQueue;
  **/
 public class ResumableExtract extends AbstractCanalLifeCycle implements Runnable {
 
-    private static final Logger                         logger              = LoggerFactory.getLogger(ResumableExtract.class);
-    private static final String                         extractSQLFormat    = "select `{0}` from `{1}`.`{2}` where `{3}` > ? order by `{4}` limit ?";
-    private static final String                         minimumKeySQLFormat = "select min(`{0}`) form `{1}`.`{2}`";
-    private              String                         minimumKeySQL;
-    private              String                         extractSQL;
-    private              FullRecordExtractor            fullRecordExtractor;
-    private              JdbcTemplate                   jdbcTemplate;
-    private              Object                         id                  = 0L;
-    private              BlockingQueue<MigrationRecord> queue;
-    private volatile     boolean                        running             = true;
-    private              MigrationTable                 table;
-    private              int                            crawSize;
+    private static final Logger logger              = LoggerFactory.getLogger(ResumableExtract.class);
+    private static final String extractSQLFormat    = "select `{0}` from `{1}`.`{2}` where `{3}` > ? order by `{4}` limit ?";
+    private static final String minimumKeySQLFormat = "select min(`{0}`) form `{1}`.`{2}`";
+    private String              minimumKeySQL;
+    private String              extractSQL;
+    private FullRecordExtractor fullRecordExtractor;
+    private JdbcTemplate        jdbcTemplate;
+    private Object              id;
+    private volatile boolean    extracting          = true;
+    private MigrationTable      table;
+    private int                 crawSize;
 
-    public ResumableExtract(FullRecordExtractor fullRecordExtractor, BlockingQueue<MigrationRecord> queue,
-                            DataSource dataSource, KeyPosition position, MigrationTable table, int crawSize) {
+    public ResumableExtract(FullRecordExtractor fullRecordExtractor){
         this.fullRecordExtractor = fullRecordExtractor;
-        this.queue = queue;
-        this.table = table;
-        this.crawSize = crawSize;
-        jdbcTemplate = new JdbcTemplate(dataSource);
+        this.table = fullRecordExtractor.getTable();
+        this.crawSize = fullRecordExtractor.getCrawSize();
+        this.jdbcTemplate = new JdbcTemplate(fullRecordExtractor.getDataSource());
+    }
+
+    @Override
+    public void start() {
+        super.start();
 
         setExtractSQL();
         setMinimumKeySQL();
 
-        if (position != null) {
-            if (position.getCurrent() == ProgressStatus.ETLING) {
-                id = position.getKey();
+        if (fullRecordExtractor.getPosition() != null) {
+            if (fullRecordExtractor.getPosition().getCurrent() == ProgressStatus.ETLING) {
+                id = fullRecordExtractor.getPosition().getKey();
             }
 
             if (id == null) {
@@ -66,34 +68,32 @@ public class ResumableExtract extends AbstractCanalLifeCycle implements Runnable
             id = getMinId();
         }
 
+        extracting = true;
         logger.info(table.getFullName() + " start , position :" + id);
     }
 
     protected String setExtractSQL() {
-        Preconditions.checkArgument(StringUtils.isNotBlank(extractSQL),
-                "extractSQL already be set,sql is:" + extractSQL);
+        Preconditions.checkArgument(StringUtils.isBlank(extractSQL), "extractSQL already be set,sql is:" + extractSQL);
         String colStr = StringUtils.join(table.getColumnNames(), ",");
-        extractSQL = new MessageFormat(extractSQLFormat).format(new Object[] { colStr, table.getSchema(),
-                                                                               table.getName(),
-                                                                               table.getPrimaryKeys().get(0),
-                                                                               table.getPrimaryKeys().get(0) });
+        extractSQL = new MessageFormat(extractSQLFormat)
+            .format(new Object[] { colStr, table.getSchema(), table.getName(), table.getPrimaryKeys().get(0).getName(),
+                                   table.getPrimaryKeys().get(0).getName() });
         return extractSQL;
     }
 
     protected String setMinimumKeySQL() {
-        Preconditions.checkArgument(StringUtils.isNotBlank(minimumKeySQL),
-                "minimumKeySQL already be set,sql is :" + minimumKeySQL);
-        minimumKeySQL = new MessageFormat(minimumKeySQLFormat).format(new Object[] { table.getPrimaryKeys().get(0),
-                                                                                     table.getSchema(),
-                                                                                     table.getName() });
+        Preconditions.checkArgument(StringUtils.isBlank(minimumKeySQL),
+            "minimumKeySQL already be set,sql is :" + minimumKeySQL);
+        minimumKeySQL = new MessageFormat(minimumKeySQLFormat)
+            .format(new Object[] { table.getPrimaryKeys().get(0).getName(), table.getSchema(), table.getName() });
         return minimumKeySQL;
     }
 
     protected Object getMinId() {
         Assert.notNull(jdbcTemplate);
-        Assert.notNull(this.minimumKeySQL);
+        Assert.notNull(minimumKeySQL);
 
-        Object min = jdbcTemplate.execute(this.minimumKeySQL, (PreparedStatementCallback<Object>) ps -> {
+        Object min = jdbcTemplate.execute(minimumKeySQL, (PreparedStatementCallback<Object>) ps -> {
             ResultSet rs = ps.executeQuery();
             Object re = null;
             while (rs.next()) {
@@ -121,8 +121,9 @@ public class ResumableExtract extends AbstractCanalLifeCycle implements Runnable
         return min;
     }
 
-    @Override public void run() {
-        while (running) {
+    @Override
+    public void run() {
+        while (extracting) {
             jdbcTemplate.execute(this.extractSQL, (PreparedStatementCallback<Object>) ps -> {
                 ps.setObject(1, id);
                 ps.setInt(2, crawSize);
@@ -150,7 +151,7 @@ public class ResumableExtract extends AbstractCanalLifeCycle implements Runnable
 
                 if (result.size() < 1) {
                     fullRecordExtractor.setStatus(ExtractStatus.TABLE_END);
-                    running = false;
+                    extracting = false;
                 }
 
                 fullRecordExtractor.putResultToQueue(result);
@@ -159,7 +160,7 @@ public class ResumableExtract extends AbstractCanalLifeCycle implements Runnable
         }
     }
 
-    public BlockingQueue<MigrationRecord> getQueue() {
-        return queue;
+    public boolean isExtracting() {
+        return extracting;
     }
 }
