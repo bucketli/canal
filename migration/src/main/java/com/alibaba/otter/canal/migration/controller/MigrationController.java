@@ -36,29 +36,28 @@ import javax.sql.DataSource;
  */
 public class MigrationController extends AbstractCanalLifeCycle {
 
-    private static final Logger      logger            = LoggerFactory.getLogger(MigrationController.class);
+    private static final Logger logger = LoggerFactory.getLogger(MigrationController.class);
 
-    private final DataSourceFactory  dataSourceFactory = new DataSourceFactory();
-    private RunMode                  runMode;
+    private final DataSourceFactory   dataSourceFactory = new DataSourceFactory();
+    private       RunMode             runMode;
     // private DBType sourceDBType = DBType.MySQL;
     // private DBType targetDBType = DBType.MySQL;
-    private DataSource               sourceDataSource;
-    private DataSource               targetDataSource;
-    private TableController          tableController;
-    private List<MigrationUnit>      migrationUnits    = Lists.newArrayList();
+    private       DataSource          sourceDataSource;
+    private       DataSource          targetDataSource;
+    private       TableController     tableController;
+    private       List<MigrationUnit> migrationUnits    = Lists.newArrayList();
 
     // private ThreadPoolExecutor extractorExecutor = null;
-    private ThreadPoolExecutor       applierExecutor   = null;
+    private ThreadPoolExecutor       applierExecutor = null;
     private ScheduledExecutorService scheduler;
 
-    private Configuration            config;
+    private Configuration config;
 
-    public MigrationController(Configuration config){
+    public MigrationController(Configuration config) {
         this.config = config;
     }
 
-    @Override
-    public void start() {
+    @Override public void start() {
         super.start();
 
         if (!dataSourceFactory.isStart()) {
@@ -96,12 +95,12 @@ public class MigrationController extends AbstractCanalLifeCycle {
 
         int applierDop = config.getInt(MigrationConstants.ETL_APPLIER_CONCURRENT_SIZE, 4);
         applierExecutor = new ThreadPoolExecutor(applierDop,
-            applierDop,
-            60,
-            TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(applierDop * 2),
-            new NamedThreadFactory("ETL-Data-Applier"),
-            new ThreadPoolExecutor.CallerRunsPolicy());
+                applierDop,
+                60,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(applierDop * 2),
+                new NamedThreadFactory("ETL-Data-Applier"),
+                new ThreadPoolExecutor.CallerRunsPolicy());
 
         int crawSize = config.getInt(MigrationConstants.EXTRACTOR_CRAW_SIZE, 1000);
         int batchSize = config.getInt(MigrationConstants.APPLIER_BATCH_SIZE, 100);
@@ -148,12 +147,12 @@ public class MigrationController extends AbstractCanalLifeCycle {
         // TODO consider other run mode
         if (runMode == RunMode.ETL || runMode == RunMode.CHECK) {
             // TODO consider other db
-            // TODO consider no primary key
+            // consider no primary key,done
             MigrationRecordExtractor extractor = new FullRecordExtractor(table,
-                sourceDataSource,
-                positioner.getLast(),
-                crawSize,
-                runMode);
+                    sourceDataSource,
+                    positioner.getLast(),
+                    crawSize,
+                    runMode);
 
             return extractor;
         } else if (runMode == RunMode.MARK) {
@@ -169,26 +168,41 @@ public class MigrationController extends AbstractCanalLifeCycle {
         // TODO consider other run mode
         // TODO consider other db
         MigrationRecordApplier applier = new BatchRecordApplier(dop,
-            batchSize,
-            applierExecutor,
-            targetDataSource,
-            table);
+                batchSize,
+                applierExecutor,
+                targetDataSource,
+                table);
         return applier;
     }
 
     protected DataSource initDataSource(String type) {
-        String username = config.getString(MigrationConstants.DATASOURCE_USERNAME_PREFIX + type);
-        String password = config.getString(MigrationConstants.DATASOURCE_PASSWORD_PREFIX + type);
-        DBType dbType = DBType.valueOf(config.getString(MigrationConstants.DATASOURCE_DBTYPE_PREFIX + type));
-        String url = config.getString(MigrationConstants.DATASOURCE_URL_PREFIX + type);
-        String encode = config.getString(MigrationConstants.DATASOURCE_ENCODE_PREFIX + type);
-        String poolSize = config.getString(MigrationConstants.DATASOURCE_POOLSIZE_PREFIX + type);
+        String username = null;
+        String password = null;
+        String url = null;
+        String encode = "UTF-8";
+        DBType dbType = DBType.MySQL;
+        String poolSize = "20";
+        if (type.equals(MigrationConstants.SOURCE)) {
+            username = config.getString(MigrationConstants.DATASOURCE_USERNAME_SOURCE);
+            password = config.getString(MigrationConstants.DATASOURCE_PASSWORD_SOURCE);
+            dbType = DBType.valueOf(config.getString(MigrationConstants.DATASOURCE_DBTYPE_SOURCE));
+            url = config.getString(MigrationConstants.DATASOURCE_URL_SOURCE);
+            encode = config.getString(MigrationConstants.DATASOURCE_ENCODE_SOURCE);
+            poolSize = config.getString(MigrationConstants.DATASOURCE_POOLSIZE_SOURCE);
+        } else if (type.equals(MigrationConstants.TARGET)) {
+            username = config.getString(MigrationConstants.DATASOURCE_USERNAME_TARGET);
+            password = config.getString(MigrationConstants.DATASOURCE_PASSWORD_TARGET);
+            dbType = DBType.valueOf(config.getString(MigrationConstants.DATASOURCE_DBTYPE_TARGET));
+            url = config.getString(MigrationConstants.DATASOURCE_URL_TARGET);
+            encode = config.getString(MigrationConstants.DATASOURCE_ENCODE_TARGET);
+            poolSize = config.getString(MigrationConstants.DATASOURCE_POOLSIZE_TARGET);
+        }
 
         Properties prop = new Properties();
         if (poolSize != null) {
             prop.setProperty("maxActive", poolSize);
         } else {
-            prop.setProperty("maxActive", "200");
+            prop.setProperty("maxActive", "20");
         }
 
         if (dbType.isMySQL()) {
@@ -233,28 +247,28 @@ public class MigrationController extends AbstractCanalLifeCycle {
 
                     // never in black table list will be migrate or sync
                     whiteTables.stream()
-                        .filter(t -> !isBlackTable(t.getName(), tableBlackList)
-                                     && !isBlackTable(t.getFullName(), tableBlackList))
-                        .forEach(t -> {
-                            TableMetaGenerator.buildColumns(sourceDataSource, (MigrationTable) t);
-                            if (!rTables.contains((MigrationTable) t)) {
-                                rTables.add((MigrationTable) t);
-                            }
-                        });
+                            .filter(t -> !isBlackTable(t.getName(), tableBlackList) && !isBlackTable(t.getFullName(),
+                                    tableBlackList))
+                            .forEach(t -> {
+                                TableMetaGenerator.buildColumns(sourceDataSource, (MigrationTable) t);
+                                if (!rTables.contains((MigrationTable) t)) {
+                                    rTables.add((MigrationTable) t);
+                                }
+                            });
                 }
             }
         } else {
             // table white list not set, fetch all table from database
             List<MigrationTable> metas = TableMetaGenerator.getTableMetaWithoutColumn(sourceDataSource, null, null);
             metas.stream()
-                .filter(
-                    t -> !isBlackTable(t.getName(), tableBlackList) && !isBlackTable(t.getFullName(), tableBlackList))
-                .forEach(t -> {
-                    TableMetaGenerator.buildColumns(sourceDataSource, (MigrationTable) t);
-                    if (!rTables.contains((MigrationTable)t)) {
-                        rTables.add((MigrationTable)t);
-                    }
-                });
+                    .filter(t -> !isBlackTable(t.getName(), tableBlackList) && !isBlackTable(t.getFullName(),
+                            tableBlackList))
+                    .forEach(t -> {
+                        TableMetaGenerator.buildColumns(sourceDataSource, (MigrationTable) t);
+                        if (!rTables.contains((MigrationTable) t)) {
+                            rTables.add((MigrationTable) t);
+                        }
+                    });
         }
 
         return rTables;
@@ -264,7 +278,7 @@ public class MigrationController extends AbstractCanalLifeCycle {
      * blackTable maybe a normal table or a table expression, whiteTable is a normal
      * table which was fetched from database metadata or a table specified in
      * config. check whiteTable whether match the blackTables and return the result
-     * 
+     *
      * @param whiteTable
      * @param blackTables
      * @return
@@ -297,8 +311,7 @@ public class MigrationController extends AbstractCanalLifeCycle {
         tableController.waitForDone();
     }
 
-    @Override
-    public void stop() {
+    @Override public void stop() {
         super.stop();
     }
 }
